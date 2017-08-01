@@ -2,11 +2,14 @@
     (:require
       [reagent.core :as r]))
 
-(def player-self (r/atom {:position 6 :in-challenge true}))
+(def player-self (r/atom {:position 6}))
 
 (def names '["William" "Kaho" "Michael" "Tom" "Trevor" "Clive" "Colin"])
 
-(defn challenge-player [id name] (js/confirm (str "Do you want to challenge " name "?")))
+(defn challenge-player [id name]
+  (let [confirm-challenge (js/confirm (str "Do you want to challenge " name "?"))]
+    (if confirm-challenge
+      (swap! player-self #(assoc-in % [:challenge] id)))))
 
 (defn can-challenge? [my-pos other-pos] (< 0 (- my-pos other-pos) 5))
 
@@ -39,14 +42,14 @@
 (defn ladder-display []
   [:div
    "Players"
-   (if (:in-challenge @player-self)
+   (if (:challenge @player-self)
      [ladder-list (sort-by :position @player-store)]
      [challenge-list (sort-by :position @player-store)])])
 
-(defn challenge-info [] [:div "You are currently engaged in a challenge"])
+(defn challenge-info [] [:div "You are currently engaged in a challenge with player " (:challenge @player-self)])
 
 (defn challenge-display []
-  (if (:in-challenge @player-self) [challenge-info]))
+  (if (:challenge @player-self) [challenge-info]))
 
 (defn home-page []
   [:div [:h2 "Top Ladder"] [ladder-display] [challenge-display]])
