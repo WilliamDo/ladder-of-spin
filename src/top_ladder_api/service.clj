@@ -23,25 +23,26 @@
     names
     (range (count names))))
 
-(def player-store (atom (reduce (fn [m p] (assoc m (:id p) p)) {} player-all)))
-
-(def challenge-store (atom {}))
+(def ladder-store
+  (atom
+    {:players (reduce (fn [m p] (assoc m (:id p) p)) {} player-all)
+     :challenges {}}))
 
 (defn all-players [request]
   {:status 200
-   :body @player-store
+   :body (:players @ladder-store)
    :headers {"Access-Control-Allow-Origin" "http://localhost:3449"
              "Access-Control-Allow-Credentials" "true"}})
 
 (defn new-challenge
   [challenger challengee]
-  (let [challenges @challenge-store]
+  (let [ladder @ladder-store challenges (:challenges ladder)]
     (if (not (or
                (contains? challenges challenger)
                (contains? challenges challengee)))
       (swap!
-        challenge-store
-        #(assoc % challenger challengee challengee challenger)))))
+        ladder-store
+        #(update-in % [:challenges] assoc challenger challengee challengee challenger)))))
 
 (defn issue-challenge [request]
   (let [challenger (get-in request [:form-params :challenger])
@@ -50,25 +51,27 @@
       (prn request)
       (new-challenge challenger challengee)
       {:status 200
-       :body @challenge-store
+       :body (:challenges ladder-store)
        :headers {"Access-Control-Allow-Origin" "http://localhost:3449"
                  "Access-Control-Allow-Credentials" "true"}})))
 
-(defn challenge-complete-win [id challenger-id]
-  (let [players @player-store
-       opponent-pos (:position (get players id))
-       curr-player challenger-id
-       self (get players curr-player)]
+(defn challenge-complete-win [challengee challenger]
+  (let [ladder @ladder-store
+        players (:players ladder)
+        challenges (:challenges ladder)
+        opponent-pos (:position (get players challengee))
+        self (get players challenger)]
    (compare-and-set!
-     player-store
-     players
-     (merge
+     ladder-store
+     ladder
+     {:players (merge
        players
        (reduce
          (fn [m [k v]] (assoc m k (assoc v :position (inc (:position v)))))
          {}
          (filter (fn [[k v]] (<= opponent-pos (:position v) (dec (:position self)))) players))
-       {curr-player (assoc (get players curr-player) :position opponent-pos)}))))
+       {challenger (assoc (get players challenger) :position opponent-pos)})
+      :challenges (dissoc challenges challengee challenger)})))
 
 (defn challenge-win [request]
   (let [challenger (get-in request [:form-params :challenger])
@@ -76,7 +79,7 @@
     (do
       (challenge-complete-win (read-string challengee) (read-string challenger))
       {:status 200
-       :body @player-store
+       :body (:players @ladder-store)
        :headers {"Access-Control-Allow-Origin" "http://localhost:3449"
                  "Access-Control-Allow-Credentials" "true"}})))
 
