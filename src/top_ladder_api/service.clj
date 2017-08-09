@@ -55,7 +55,7 @@
        :headers {"Access-Control-Allow-Origin" "http://localhost:3449"
                  "Access-Control-Allow-Credentials" "true"}})))
 
-(defn challenge-complete-win [challengee challenger]
+(defn challenge-success [challengee challenger]
   (let [ladder @ladder-store
         players (:players ladder)
         challenges (:challenges ladder)
@@ -73,11 +73,19 @@
        {challenger (assoc (get players challenger) :position opponent-pos)})
       :challenges (dissoc challenges challengee challenger)})))
 
+(defn challenge-fail [challengee challenger]
+  (let [ladder @ladder-store players (:players ladder) challenges (:challenges ladder)]
+    (compare-and-set!
+      ladder-store
+      ladder
+      {:players players
+       :challenges (dissoc challenges challengee challenger)})))
+
 (defn challenge-win [request]
   (let [challenger (get-in request [:form-params :challenger])
         challengee (get-in request [:form-params :challengee])]
     (do
-      (challenge-complete-win (read-string challengee) (read-string challenger))
+      (challenge-success (read-string challengee) (read-string challenger))
       {:status 200
        :body (:players @ladder-store)
        :headers {"Access-Control-Allow-Origin" "http://localhost:3449"
