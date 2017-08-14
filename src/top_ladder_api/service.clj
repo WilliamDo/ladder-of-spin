@@ -34,6 +34,12 @@
    :headers {"Access-Control-Allow-Origin" "http://localhost:3449"
              "Access-Control-Allow-Credentials" "true"}})
 
+(defn ladder-info [request]
+  {:status 200
+   :body @ladder-store
+   :headers {"Access-Control-Allow-Origin" "http://localhost:3449"
+             "Access-Control-Allow-Credentials" "true"}})
+
 (defn new-challenge
   [challenger challengee]
   (let [ladder @ladder-store challenges (:challenges ladder)]
@@ -42,52 +48,71 @@
                (contains? challenges challengee)))
       (swap!
         ladder-store
-        #(update-in % [:challenges] assoc challenger challengee challengee challenger)))))
+        #(update-in % [:challenges] assoc
+          challenger {:opponent challengee :challenger true}
+          challengee {:opponent challenger :challenger false})))))
 
 (defn issue-challenge [request]
   (let [challenger (get-in request [:form-params :challenger])
         challengee (get-in request [:form-params :challengee])]
     (do
       (prn request)
-      (new-challenge challenger challengee)
+      (new-challenge (read-string challenger) (read-string challengee))
       {:status 200
        :body (:challenges ladder-store)
        :headers {"Access-Control-Allow-Origin" "http://localhost:3449"
                  "Access-Control-Allow-Credentials" "true"}})))
 
-(defn challenge-success [challengee challenger]
-  (let [ladder @ladder-store
-        players (:players ladder)
+(defn confirm-challenge-win [winner opponent]
+  (swap! ladder-store #(assoc-in % [:challenges winner :result] :win)))
+
+(defn confirm-challenge-loss [loser opponent]
+  (swap! ladder-store #(assoc-in % [:challenges loser :result] :loss)))
+
+(defn challenge-success [ladder challenger challengee]
+  (let [players (:players ladder)
         challenges (:challenges ladder)
         opponent-pos (:position (get players challengee))
         self (get players challenger)]
-   (compare-and-set!
-     ladder-store
-     ladder
-     {:players (merge
-       players
-       (reduce
-         (fn [m [k v]] (assoc m k (assoc v :position (inc (:position v)))))
-         {}
-         (filter (fn [[k v]] (<= opponent-pos (:position v) (dec (:position self)))) players))
-       {challenger (assoc (get players challenger) :position opponent-pos)})
-      :challenges (dissoc challenges challengee challenger)})))
+    (compare-and-set!
+      ladder-store
+      ladder
+      {:players (merge players
+                  (reduce
+                    (fn [m [k v]] (assoc m k (assoc v :position (inc (:position v)))))
+                    {}
+                    (filter (fn [[k v]] (<= opponent-pos (:position v) (dec (:position self)))) players))
+                  {challenger (assoc (get players challenger) :position opponent-pos)})
+       :challenges (dissoc challenges challengee challenger)})))
 
-(defn challenge-fail [challengee challenger]
-  (let [ladder @ladder-store players (:players ladder) challenges (:challenges ladder)]
+(defn challenge-fail [ladder challenger challengee]
+  (let [players (:players ladder) challenges (:challenges ladder)]
     (compare-and-set!
       ladder-store
       ladder
       {:players players
        :challenges (dissoc challenges challengee challenger)})))
 
-(defn challenge-win [request]
-  (let [challenger (get-in request [:form-params :challenger])
-        challengee (get-in request [:form-params :challengee])]
+(defn resolve-challenge [challenger challengee]
+  (let [ladder @ladder-store
+        challenges (:challenges ladder)
+        challenger-claim (get-in challenges [challenger :result])
+        challengee-claim (get-in challenges [challengee :result])]
+    (cond
+      (and (= challenger-claim :loss) (= challengee-claim :win)) (challenge-fail ladder challenger challengee)
+      (and (= challenger-claim :win) (= challengee-claim :loss)) (challenge-success ladder challenger challengee))))
+
+(defn confirm-result [request]
+  (let [player (get-in request [:form-params :player])
+        opponent (get-in request [:form-params :opponent])
+        result (read-string (get-in request [:form-params :result]))]
     (do
-      (challenge-success (read-string challengee) (read-string challenger))
+      (prn request)
+      (cond
+        (= result :win) (confirm-challenge-win (read-string player) (read-string opponent))
+        (= result :loss) (confirm-challenge-loss (read-string player) (read-string opponent)))
       {:status 200
-       :body (:players @ladder-store)
+       :body @ladder-store
        :headers {"Access-Control-Allow-Origin" "http://localhost:3449"
                  "Access-Control-Allow-Credentials" "true"}})))
 
@@ -100,8 +125,9 @@
 (def routes #{["/" :get (conj common-interceptors `home-page)]
               ["/about" :get (conj common-interceptors `about-page)]
               ["/players" :get all-players :route-name :players]
+              ["/ladder" :get ladder-info :route-name :ladder]
               ["/challenge" :post (conj [(body-params/body-params)] `issue-challenge)]
-              ["/challenge-win" :post (conj [(body-params/body-params)] `challenge-win)]})
+              ["/confirm-result" :post (conj [(body-params/body-params)] `confirm-result)]})
 
 ;; Map-based routes
 ;(def routes `{"/" {:interceptors [(body-params/body-params) http/html-body]
