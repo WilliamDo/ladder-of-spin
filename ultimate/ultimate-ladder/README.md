@@ -1,5 +1,7 @@
 # Ultimate Ladder
 
+Ultimate Ladder is a simple web application to manage a single table tennis ladder.
+
 ## Getting started
 
 ```
