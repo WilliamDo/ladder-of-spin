@@ -2,7 +2,7 @@
 
 Ultimate Ladder is a simple web application to manage a single table tennis ladder.
 
-## Getting started
+## Getting started
 
 ```
 docker build -t ultimate-ladder .
