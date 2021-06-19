@@ -27,9 +27,14 @@ To learn more about configuring Logback, read its [documentation](http://logback
 
 ### [Docker](https://www.docker.com/) container support
 
-1. Build an uberjar of your service: `lein uberjar`
-2. Build a Docker image: `sudo docker build -t top-ladder-api .`
-3. Run your Docker image: `docker run -p 8080:8080 top-ladder-api`
+1. ~~Build an uberjar of your service: `lein uberjar`~~
+2. ~~Build a Docker image: `sudo docker build -t top-ladder-api .`~~
+3. ~~Run your Docker image: `docker run -p 8080:8080 top-ladder-api`~~
+
+```
+docker build -t top-ladder-api .
+docker run -it -p 8080:8080 --rm top-ladder-api
+```
 
 ### [OSv](http://osv.io/) unikernel support with [Capstan](http://osv.io/capstan/)
 

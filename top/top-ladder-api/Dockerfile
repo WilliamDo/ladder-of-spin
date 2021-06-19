@@ -1,8 +1,8 @@
-FROM java:8-alpine
-MAINTAINER Your Name <you@example.com>
-
-ADD target/top-ladder-api-0.0.1-SNAPSHOT-standalone.jar /top-ladder-api/app.jar
-
-EXPOSE 8080
-
-CMD ["java", "-jar", "/top-ladder-api/app.jar"]
+FROM clojure:openjdk-17
+RUN mkdir -p /usr/src/app
+WORKDIR /usr/src/app
+COPY project.clj /usr/src/app/
+RUN lein deps
+COPY . /usr/src/app
+RUN mv "$(lein uberjar | sed -n 's/^Created \(.*standalone\.jar\)/\1/p')" app-standalone.jar
+CMD ["java", "-jar", "app-standalone.jar"]
