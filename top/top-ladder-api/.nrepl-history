@@ -1,0 +1,8 @@
+(require :reload 'top-ladder-api.service)
+(require :reload 'top-ladder-api.server)
+(require :reload 'top-ladder-api)
+(require :reload 'top-ladder-api.server)
+(require :reload top-ladder-api.server)
+(quit)
+(require 'top-ladder-api.server)
+(quit)
